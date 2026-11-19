@@ -2,7 +2,7 @@
 #
 # Usage:
 #   * Comment "/2048" on any issue to start a game. This workflow replaces the
-#     comment with an ASCII board and four checkboxes acting as arrow buttons.
+#     comment with a Mermaid board and four checkboxes acting as arrow buttons.
 #   * Check one of the boxes (up / down / left / right). Checking a box edits
 #     the comment, which fires issue_comment "edited" and runs this workflow
 #     again. The board is recomputed and the comment is replaced in place.
@@ -64,6 +64,19 @@ jobs:
 
           BUTTONS = (("up", "👆"), ("left", "👈"), ("right", "👉"), ("down", "👇"))
           PADDING = {"up": 40, "left": 0, "right": 80, "down": 40}
+          TILE_COLORS = {
+              2: ("#eee4da", "#776e65"),
+              4: ("#ede0c8", "#776e65"),
+              8: ("#f2b179", "#f9f6f2"),
+              16: ("#f59563", "#f9f6f2"),
+              32: ("#f67c5f", "#f9f6f2"),
+              64: ("#f65e3b", "#f9f6f2"),
+              128: ("#edcf72", "#f9f6f2"),
+              256: ("#edcc61", "#f9f6f2"),
+              512: ("#edc850", "#f9f6f2"),
+              1024: ("#edc53f", "#f9f6f2"),
+              2048: ("#edc22e", "#f9f6f2"),
+          }
           DIRECTIONS = tuple(direction for direction, _ in BUTTONS)
           direction_pattern = "|".join(DIRECTIONS)
           state_match = re.search(
@@ -147,12 +160,33 @@ jobs:
               return changed
 
           def render(grid):
-              width = max(4, max(len(str(v)) for row in grid for v in row))
-              border = "+" + "+".join("-" * (width + 2) for _ in range(4)) + "+"
-              lines = [border]
-              for row in grid:
-                  lines.append("|" + "|".join(f"{v:>{width + 2}}" for v in row) + "|")
-                  lines.append(border)
+              lines = ["flowchart TB"]
+              for r in range(4):
+                  lines.append(f'  subgraph row{r}[" "]')
+                  lines.append("    direction LR")
+                  nodes = [f'n{r}{c}["{grid[r][c] or ""}"]' for c in range(4)]
+                  lines.append("    " + " ~~~ ".join(nodes))
+                  lines.append("  end")
+              lines.append("  classDef empty fill:#bbada0,stroke:#bbada0,color:#bbada0;")
+              for value, (fill, color) in TILE_COLORS.items():
+                  lines.append(
+                      f"  classDef t{value} fill:{fill},stroke:#bbada0,"
+                      f"color:{color},stroke-width:2px;"
+                  )
+              lines.append(
+                  "  classDef tmax fill:#3c3a32,stroke:#bbada0,"
+                  "color:#f9f6f2,stroke-width:2px;"
+              )
+              for r in range(4):
+                  for c in range(4):
+                      value = grid[r][c]
+                      style = (
+                          "empty" if value == 0
+                          else f"t{value if value in TILE_COLORS else 'max'}"
+                      )
+                      lines.append(f"  class n{r}{c} {style};")
+              for r in range(4):
+                  lines.append(f"  style row{r} fill:none,stroke:none")
               return "\n".join(lines)
 
           def game_over(grid):
@@ -189,7 +223,7 @@ jobs:
           )
           comment = (
               f"{status}\n\n"
-              f"```\n{render(grid)}\n```\n\n"
+              f"```mermaid\n{render(grid)}\n```\n\n"
               f"{buttons}\n\n"
               f"<!-- 2048-state board:{to_str(grid)} seed:{seed} turns:{turns} -->"
           )

@@ -167,6 +167,9 @@ jobs:
                   nodes = [f'n{r}{c}["{grid[r][c] or " "}"]' for c in range(4)]
                   lines.append("    " + " ~~~ ".join(nodes))
                   lines.append("  end")
+              lines.append("  row0 ~~~ row1")
+              lines.append("  row1 ~~~ row2")
+              lines.append("  row2 ~~~ row3")
               lines.append("  classDef empty fill:#bbada0,stroke:#bbada0,color:#bbada0;")
               for value, (fill, color) in TILE_COLORS.items():
                   lines.append(

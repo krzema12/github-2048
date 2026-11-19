@@ -62,7 +62,8 @@ jobs:
               with urlopen(req) as res:
                   res.read()
 
-          DIRECTIONS = ("up", "down", "left", "right")
+          BUTTONS = (("up", "👆"), ("left", "👈"), ("right", "👉"), ("down", "👇"))
+          DIRECTIONS = tuple(direction for direction, _ in BUTTONS)
           direction_pattern = "|".join(DIRECTIONS)
           state_match = re.search(
               r"2048-state board:(\S+) seed:(\d+) turns:(\d+)", body
@@ -181,7 +182,8 @@ jobs:
                   status += " No moves left — comment `/2048` to restart."
 
           buttons = "\n".join(
-              f"- [ ] {d} 2048-move:{d}" for d in DIRECTIONS
+              f"- [ ] {emoji} {direction} <!-- 2048-move:{direction} -->"
+              for direction, emoji in BUTTONS
           )
           comment = (
               f"{status}\n\n"

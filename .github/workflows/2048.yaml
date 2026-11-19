@@ -65,7 +65,7 @@ jobs:
           BUTTONS = (("up", "👆"), ("left", "👈"), ("right", "👉"), ("down", "👇"))
           PADDING = {"up": 40, "left": 0, "right": 80, "down": 40}
           NBSP = "\u00a0"
-          EMPTY_LABEL = NBSP * 4
+          EMPTY_LABEL = "0000"
           LABEL_WIDTH = 4
           TILE_COLORS = {
               2: ("#eee4da", "#776e65"),

@@ -1,0 +1,193 @@
+# 2048 in a GitHub issue comment.
+#
+# Usage:
+#   * Comment "/2048" on any issue to start a game. This workflow replaces the
+#     comment with an ASCII board and four checkboxes acting as arrow buttons.
+#   * Check one of the boxes (up / down / left / right). Checking a box edits
+#     the comment, which fires issue_comment "edited" and runs this workflow
+#     again. The board is recomputed and the comment is replaced in place.
+#
+# The complete game state (board, RNG seed, turn counter) is stored in a
+# hidden HTML comment inside the comment body, so no external storage is
+# needed. The board string is 16 comma-separated numbers, row by row.
+
+name: '2048'
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: 2048-${{ github.event.comment.id }}
+
+jobs:
+  play:
+    if: ${{ !github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start game or apply move
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          ACTOR: ${{ github.event.sender.login }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, random
+          from urllib.request import Request, urlopen
+
+          token = os.environ["GH_TOKEN"]
+          repo = os.environ["REPOSITORY"]
+          comment_id = int(os.environ["COMMENT_ID"])
+          body = os.environ["COMMENT_BODY"]
+          actor = os.environ["ACTOR"]
+
+          def patch_comment(text):
+              req = Request(
+                  f"https://api.github.com/repos/{repo}/issues/comments/{comment_id}",
+                  data=json.dumps({"body": text}).encode(),
+                  method="PATCH",
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Accept": "application/vnd.github+json",
+                      "Content-Type": "application/json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              with urlopen(req) as res:
+                  res.read()
+
+          DIRECTIONS = ("up", "down", "left", "right")
+          direction_pattern = "|".join(DIRECTIONS)
+          state_match = re.search(
+              r"2048-state board:(\S+) seed:(\d+) turns:(\d+)", body
+          )
+          checked = re.findall(
+              rf"^\s*-\s+\[[xX]\][^\n]*?2048-move:({direction_pattern})\b",
+              body,
+              re.MULTILINE,
+          )
+          is_new_game = (
+              state_match is None
+              and re.search(r"(?<![\w/-])/2048(?![\w/-])", body) is not None
+          )
+
+          if checked:
+              if state_match is None:
+                  raise SystemExit(0)
+              move = checked[0]
+              board_str = state_match.group(1)
+              seed = int(state_match.group(2))
+              turns = int(state_match.group(3)) + 1
+          elif is_new_game:
+              move = "new"
+              board_str = None
+              seed = random.SystemRandom().randint(1, 2**31 - 1)
+              turns = 1
+          else:
+              raise SystemExit(0)
+
+          rng = random.Random(seed + turns)
+
+          def random_tile(grid):
+              empty = [(r, c) for r in range(4) for c in range(4) if grid[r][c] == 0]
+              if not empty:
+                  return
+              r, c = rng.choice(empty)
+              grid[r][c] = 2 if rng.random() < 0.9 else 4
+
+          def from_str(s):
+              parts = s.split(",")
+              if len(parts) != 16 or any(
+                  re.fullmatch(r"\d{1,10}", p) is None for p in parts
+              ):
+                  raise SystemExit(0)
+              vals = [int(p) for p in parts]
+              if any(v and v & (v - 1) for v in vals):
+                  raise SystemExit(0)
+              return [vals[i * 4:(i + 1) * 4] for i in range(4)]
+
+          def to_str(grid):
+              return ",".join(str(v) for row in grid for v in row)
+
+          def slide(line):
+              tiles = [v for v in line if v]
+              result, i = [], 0
+              while i < len(tiles):
+                  if i + 1 < len(tiles) and tiles[i] == tiles[i + 1]:
+                      result.append(tiles[i] * 2)
+                      i += 2
+                  else:
+                      result.append(tiles[i])
+                      i += 1
+              return result + [0] * (4 - len(result))
+
+          def apply_move(grid, direction):
+              changed = False
+              for fixed in range(4):
+                  order = range(4) if direction in ("left", "up") else range(3, -1, -1)
+                  if direction in ("left", "right"):
+                      line = [grid[fixed][i] for i in order]
+                      new_line = slide(line)
+                      for pos, value in zip(order, new_line):
+                          grid[fixed][pos] = value
+                  else:
+                      line = [grid[i][fixed] for i in order]
+                      new_line = slide(line)
+                      for pos, value in zip(order, new_line):
+                          grid[pos][fixed] = value
+                  changed = changed or line != new_line
+              return changed
+
+          def render(grid):
+              width = max(4, max(len(str(v)) for row in grid for v in row))
+              border = "+" + "+".join("-" * (width + 2) for _ in range(4)) + "+"
+              lines = [border]
+              for row in grid:
+                  lines.append("|" + "|".join(f"{v:>{width + 2}}" for v in row) + "|")
+                  lines.append(border)
+              return "\n".join(lines)
+
+          def game_over(grid):
+              if any(0 in row for row in grid):
+                  return False
+              horizontal = any(
+                  grid[r][c] == grid[r][c + 1] for r in range(4) for c in range(3)
+              )
+              vertical = any(
+                  grid[r][c] == grid[r + 1][c] for r in range(3) for c in range(4)
+              )
+              return not (horizontal or vertical)
+
+          if move == "new":
+              grid = [[0] * 4 for _ in range(4)]
+              random_tile(grid)
+              random_tile(grid)
+              status = f"@{actor} started a new game."
+          else:
+              grid = from_str(board_str)
+              before = [row[:] for row in grid]
+              if apply_move(grid, move):
+                  random_tile(grid)
+              status = f"@{actor} moved **{move}**."
+              if grid == before:
+                  status += " No tiles moved — try another direction."
+              if game_over(grid):
+                  status += " No moves left — comment `/2048` to restart."
+
+          buttons = "\n".join(
+              f"- [ ] {d} 2048-move:{d}" for d in DIRECTIONS
+          )
+          comment = (
+              f"{status}\n\n"
+              f"```\n{render(grid)}\n```\n\n"
+              f"{buttons}\n\n"
+              f"<!-- 2048-state board:{to_str(grid)} seed:{seed} turns:{turns} -->"
+          )
+          patch_comment(comment)
+          PY

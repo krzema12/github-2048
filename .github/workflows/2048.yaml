@@ -163,22 +163,13 @@ jobs:
               return changed
 
           def render(grid):
-              lines = [
-                  '%%{init: {"flowchart": {"nodeSpacing": 5, "rankSpacing": 5}}}%%',
-                  "flowchart TB",
-              ]
+              lines = ["block-beta", "  columns 4"]
               for r in range(4):
-                  lines.append(f'  subgraph row{r}[" "]')
-                  lines.append("    direction LR")
                   nodes = [
                       f'n{r}{c}["{str(grid[r][c]).ljust(LABEL_WIDTH, NBSP) if grid[r][c] else EMPTY_LABEL}"]'
                       for c in range(4)
                   ]
-                  lines.append("    " + " ~~~ ".join(nodes))
-                  lines.append("  end")
-              lines.append("  row0 ~~~ row1")
-              lines.append("  row1 ~~~ row2")
-              lines.append("  row2 ~~~ row3")
+                  lines.append("  " + " ".join(nodes))
               lines.append(
                   "  classDef empty fill:#bbada0,stroke:#bbada0,color:#bbada0,"
                   "font-family:monospace;"
@@ -199,9 +190,7 @@ jobs:
                           "empty" if value == 0
                           else f"t{value if value in TILE_COLORS else 'max'}"
                       )
-                      lines.append(f"  class n{r}{c} {style};")
-              for r in range(4):
-                  lines.append(f"  style row{r} fill:none,stroke:none")
+                      lines.append(f"  class n{r}{c} {style}")
               return "\n".join(lines)
 
           def game_over(grid):

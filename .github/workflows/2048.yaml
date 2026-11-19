@@ -63,6 +63,7 @@ jobs:
                   res.read()
 
           BUTTONS = (("up", "👆"), ("left", "👈"), ("right", "👉"), ("down", "👇"))
+          PADDING = {"up": 4, "left": 0, "right": 8, "down": 4}
           DIRECTIONS = tuple(direction for direction, _ in BUTTONS)
           direction_pattern = "|".join(DIRECTIONS)
           state_match = re.search(
@@ -182,7 +183,8 @@ jobs:
                   status += " No moves left — comment `/2048` to restart."
 
           buttons = "\n".join(
-              f"- [ ] {emoji} {direction} <!-- 2048-move:{direction} -->"
+              f"- [ ] {'&nbsp;' * PADDING[direction]}{emoji} {direction} "
+              f"<!-- 2048-move:{direction} -->"
               for direction, emoji in BUTTONS
           )
           comment = (

@@ -164,7 +164,7 @@ jobs:
               for r in range(4):
                   lines.append(f'  subgraph row{r}[" "]')
                   lines.append("    direction LR")
-                  nodes = [f'n{r}{c}["{grid[r][c] or ""}"]' for c in range(4)]
+                  nodes = [f'n{r}{c}["{grid[r][c] or " "}"]' for c in range(4)]
                   lines.append("    " + " ~~~ ".join(nodes))
                   lines.append("  end")
               lines.append("  classDef empty fill:#bbada0,stroke:#bbada0,color:#bbada0;")

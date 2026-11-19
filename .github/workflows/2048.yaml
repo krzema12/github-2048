@@ -63,7 +63,7 @@ jobs:
                   res.read()
 
           BUTTONS = (("up", "👆"), ("left", "👈"), ("right", "👉"), ("down", "👇"))
-          PADDING = {"up": 4, "left": 0, "right": 8, "down": 4}
+          PADDING = {"up": 40, "left": 0, "right": 80, "down": 40}
           DIRECTIONS = tuple(direction for direction, _ in BUTTONS)
           direction_pattern = "|".join(DIRECTIONS)
           state_match = re.search(
